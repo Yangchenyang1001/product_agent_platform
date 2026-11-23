@@ -1,0 +1,119 @@
+# ============================================================
+# agent_platform  (.gitignore)
+# 结构：kmp-parent（Java / Maven 多模块）、kmp-ui（Vue 3 + Element Plus）
+# ============================================================
+
+# ---------- IntelliJ IDEA / JetBrains ----------
+.idea/
+.idea_modules/
+*.iml
+*.ipr
+*.iws
+out/
+.idea/**/workspace.xml
+.idea/**/usage.statistics.xml
+.idea/**/shelf/
+.idea/**/tasks.xml
+.idea/**/dictionaries/
+*.hprof
+*.hprof.*
+
+# ---------- Eclipse ----------
+.classpath
+.project
+.settings/
+.factorypath
+.metadata/
+
+# ---------- VS Code / 其他编辑器 ----------
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.history/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+nbproject/private/
+nbbuild/
+
+# ---------- Java / Maven ----------
+target/
+build/
+classes/
+*.class
+*.jar
+*.war
+*.ear
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+dependency-reduced-pom.xml
+.flattened-pom.xml
+*.versionsBackup
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+release.properties
+maven-status/
+generated-sources/
+generated-test-sources/
+
+# ---------- 日志 / 临时文件 ----------
+logs/
+*.log
+!*.log.example
+hs_err_pid*
+replay_pid*
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*.pid
+
+# ---------- Node / Vue（kmp-ui 第三方依赖与产物）----------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+.npm/
+.yarn/
+.cache/
+coverage/
+.nyc_output/
+.eslintcache
+.stylelintcache
+stats.html
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------- 本地环境 / 覆盖配置（保留 .env.development、.env.production）----------
+.env.local
+.env.*.local
+*.local
+local.properties
+application-local.yml
+application-local.yaml
+application-local.properties
+
+# ---------- 密钥 / 证书（防止误提交）----------
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+
+# ---------- 操作系统 ----------
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
