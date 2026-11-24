@@ -7,7 +7,7 @@
       </el-tag>
     </header>
 
-    <div v-if="displayText" class="answer-text">{{ displayText }}</div>
+    <markdown-content v-if="displayText" class="answer-text" :content="displayText" />
     <div v-else-if="status === 'streaming'" class="typing-placeholder">
       <i></i><i></i><i></i>
     </div>
@@ -99,6 +99,7 @@
 
 <script setup>
 import { CircleCheck, CopyDocument, Loading } from '@element-plus/icons-vue'
+import MarkdownContent from '@/components/kmp/markdown-content/index.vue'
 
 const props = defineProps({
   answerText: { type: String, default: '' },
@@ -293,9 +294,9 @@ function formatDuration(duration) {
 }
 
 .answer-text {
+  min-width: 0;
   color: var(--el-text-color-primary);
   line-height: 1.85;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
