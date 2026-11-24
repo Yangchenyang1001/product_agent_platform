@@ -10,10 +10,17 @@ import com.ycy.core.mapper.KnowledgeQuerySessionMapper;
 import com.ycy.core.service.KnowledgeQuerySessionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -64,12 +71,21 @@ public class KnowledgeQuerySessionServiceImpl extends ServiceImpl<KnowledgeQuery
         return session.getId();
     }
 
+    @Autowired
+    @Qualifier("knowledgeSystemRestClient")
+    RestClient restClient;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean removeSession(Long id, Long userId) {
         log.info("开始删除知识查询会话，userId={}，sessionId={}", userId, id);
 
         LocalDateTime now = LocalDateTime.now();
+        log.info("调用外部知识库清除聊天记录，sessionId={}", id);
+
+        //远程调用删除外部知识库会话  聊天记录
+        restClient.delete().uri("/history/{session_id}", id)
+                .retrieve().toBodilessEntity();
 
         // 如果想在逻辑删除时同时更新审计字段（更新用户、更新时间），可以使用以下代码显示做update操作
         LambdaUpdateWrapper<KnowledgeQuerySession> wrapper =
@@ -87,6 +103,25 @@ public class KnowledgeQuerySessionServiceImpl extends ServiceImpl<KnowledgeQuery
     @Transactional(rollbackFor = Exception.class)
     public boolean clearSessions(Long userId) {
         log.info("开始清理知识查询会话，userId={}", userId);
+        //获取所有sessionid
+        LambdaQueryWrapper<KnowledgeQuerySession> queryWrapper =
+                new LambdaQueryWrapper<KnowledgeQuerySession>()
+                        .select(KnowledgeQuerySession::getId)
+                        .eq(KnowledgeQuerySession::getCreateUserId, userId)
+                        .eq(KnowledgeQuerySession::getIsDeleted, 0);
+
+        List<KnowledgeQuerySession> sessionList = this.list(queryWrapper);
+        if (sessionList == null || sessionList.size() == 0) {
+            return false;
+        }
+        List<Long> sessionIds = sessionList.stream().map(KnowledgeQuerySession::getId).collect(Collectors.toList());
+        log.info("调用外部知识库清除聊天记录，sessionIds={}", sessionIds.stream().map(String::valueOf).collect(Collectors.joining(",")));
+        restClient.post().uri("/history/clear_all")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("session_ids", sessionIds))
+                .retrieve()
+                .toBodilessEntity();
+
         LocalDateTime now = LocalDateTime.now();
 
         // 只清理当前用户的有效索引，并同步维护审计字段。
