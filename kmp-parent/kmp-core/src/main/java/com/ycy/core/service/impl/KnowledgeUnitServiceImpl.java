@@ -9,6 +9,7 @@ import com.ycy.common.core.domain.entity.SysUser;
 import com.ycy.common.exception.ServiceException;
 import com.ycy.core.config.KmpConfig;
 import com.ycy.core.constant.KnowledgeUnitConstants;
+import com.ycy.core.dto.DeleteDocumentChunksResponse;
 import com.ycy.core.dto.ExternalKnowledgeTaskStatus;
 import com.ycy.core.dto.KnowledgeChunk;
 import com.ycy.core.dto.KnowledgeChunkPageResponse;
@@ -144,8 +145,27 @@ public class KnowledgeUnitServiceImpl extends ServiceImpl<KnowledgeUnitMapper, K
     @Transactional(rollbackFor = Exception.class)
     public boolean removeKnowledgeUnit(Long id) {
         log.info("开始逻辑删除知识单元，knowledgeUnitId={}", id);
+        // 删除知识单元下的全部切片信息
+        String documentId = null;
+        DeleteDocumentChunksResponse result = null;
 
-        // TODO 删除知识单元下的全部切片信息
+        try {
+            // 获取知识单元
+            KnowledgeUnit knowledgeUnit = this.getById(id);
+            // 获取文档 ID
+            documentId = knowledgeUnit.getDocumentId();
+
+            // 批量清空切片
+            restClient.delete()
+                    .uri("/knowledge-units/{documentId}/chunks", documentId)
+                    .retrieve()
+                    .body(DeleteDocumentChunksResponse.class);
+
+        } catch (Exception e) {
+            log.error("清空切片响应异常，documentId={}，result={}", documentId, result, e);
+            throw new ServiceException("删除失败");
+        }
+
         return this.removeById(id);
     }
 

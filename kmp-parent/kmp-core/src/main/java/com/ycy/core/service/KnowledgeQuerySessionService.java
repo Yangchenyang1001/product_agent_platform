@@ -1,5 +1,7 @@
 package com.ycy.core.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ycy.core.entity.KnowledgeQuerySession;
 import com.baomidou.mybatisplus.spring.service.IService;
 
@@ -13,4 +15,11 @@ import com.baomidou.mybatisplus.spring.service.IService;
  */
 public interface KnowledgeQuerySessionService extends IService<KnowledgeQuerySession> {
 
+    IPage<KnowledgeQuerySession> pageSessions(Page<KnowledgeQuerySession> page, String sessionTitle, Long userId);
+
+    Long createSession(KnowledgeQuerySession session, Long userId);
+
+    boolean removeSession(Long id, Long userId);
+
+    boolean clearSessions(Long userId);
 }
