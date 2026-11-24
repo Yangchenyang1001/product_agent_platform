@@ -79,11 +79,39 @@ public class KnowledgeUnitServiceImpl extends ServiceImpl<KnowledgeUnitMapper, K
      * 为对外返回的知识单元批量补充 MinIO 完整下载地址。
      */
     private void fillOriginalFileDownloadUrls(List<KnowledgeUnit> knowledgeUnitList) {
-        String endpoint = kmpConfig.getMinioPublicEndpoint();
         for (KnowledgeUnit knowledgeUnit : knowledgeUnitList) {
-            String downloadUrl = endpoint + knowledgeUnit.getOriginalFileDownloadUrl();
-            knowledgeUnit.setOriginalFileDownloadUrl(downloadUrl);
+            knowledgeUnit.setOriginalFileDownloadUrl(resolveDownloadUrl(knowledgeUnit.getOriginalFileDownloadUrl()));
         }
+    }
+
+    /**
+     * 把库里的下载地址补成浏览器可直接访问的完整 URL。
+     * <p>
+     * 外部切片服务回传的可能是预签名绝对地址，也可能是不带端点的对象路径：
+     * 绝对地址原样返回，只有相对路径才拼接 MinIO 端点，避免出现
+     * {@code http://host:9000http://other:9000/...} 这种非法地址。
+     * </p>
+     *
+     * @param originalFileDownloadUrl 库中存储的下载地址或对象路径
+     * @return 可直接访问的完整下载地址，入参为空时返回 null
+     */
+    private String resolveDownloadUrl(String originalFileDownloadUrl) {
+        if (originalFileDownloadUrl == null || originalFileDownloadUrl.isBlank()) {
+            return null;
+        }
+        String downloadUrl = originalFileDownloadUrl.trim();
+        // 已经带协议头，说明是完整的预签名地址，不能再拼端点。
+        if (downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://")) {
+            return downloadUrl;
+        }
+        String endpoint = kmpConfig.getMinioPublicEndpoint();
+        if (endpoint == null || endpoint.isBlank()) {
+            return downloadUrl;
+        }
+        // 端点末尾的斜杠与对象路径开头的斜杠只保留一个。
+        String base = endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint;
+        String path = downloadUrl.startsWith("/") ? downloadUrl : "/" + downloadUrl;
+        return base + path;
     }
 
     /**
@@ -116,9 +144,7 @@ public class KnowledgeUnitServiceImpl extends ServiceImpl<KnowledgeUnitMapper, K
         knowledgeUnit.setCreateUserName(this.findUserDisplayName(knowledgeUnit.getCreateUserId()));
         knowledgeUnit.setUpdateUserName(this.findUserDisplayName(knowledgeUnit.getUpdateUserId()));
 
-        String endpoint = kmpConfig.getMinioPublicEndpoint();
-        String downloadUrl = endpoint + knowledgeUnit.getOriginalFileDownloadUrl();
-        knowledgeUnit.setOriginalFileDownloadUrl(downloadUrl);
+        knowledgeUnit.setOriginalFileDownloadUrl(resolveDownloadUrl(knowledgeUnit.getOriginalFileDownloadUrl()));
         return knowledgeUnit;
     }
 

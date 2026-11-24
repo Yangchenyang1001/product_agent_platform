@@ -14,7 +14,9 @@ import java.time.Duration;
 @Component
 @EnableScheduling
 public class KmpConfig {
-    /** MinIO 公网访问端点，不包对象路径。 */
+    /**
+     * MinIO 公网访问端点，不包对象路径。
+     */
     @Value("${kmp.minio-public-endpoint}")
     private String minioPublicEndpoint;
 
@@ -44,8 +46,7 @@ public class KmpConfig {
      * @return RestClient
      */
     @Bean("knowledgeSystemRestClient")
-    public RestClient knowledgeSystemRestClient()
-    {
+    public RestClient knowledgeSystemRestClient() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(knowledgeSystemConnectTimeout);
         requestFactory.setReadTimeout(knowledgeSystemReadTimeout);
@@ -56,4 +57,29 @@ public class KmpConfig {
                 .baseUrl(knowledgeSystemBaseUrl)
                 .build();
     }
+
+
+    @Value("${kmp.qwen.base-url}")
+    private String qwenBaseUrl;
+
+    /**
+     * 百炼 REST 客户端统一使用五秒连接、二十秒读取超时。
+     *
+     * @return 独立 RestClient Builder
+     */
+    @Bean("qwenRestClient")
+    public RestClient qwenRestClient() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(10));
+        requestFactory.setReadTimeout(Duration.ofSeconds(30));
+
+        return RestClient
+                .builder()
+                .requestFactory(requestFactory)
+                .baseUrl(qwenBaseUrl)
+                .build();
+    }
+
+
+
 }

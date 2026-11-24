@@ -1,5 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ycy.core.mapper.KnowledgeQuestionClusterMapper">
+    <resultMap id="KnowledgeQuestionClusterResult"
+               type="com.ycy.core.entity.KnowledgeQuestionCluster"
+               autoMapping="true">
+        <id property="id" column="id"/>
+        <result property="recentQuestions" column="recent_questions"
+                javaType="java.util.List"
+                typeHandler="com.ycy.core.typehandler.KnowledgeRecentQuestionListTypeHandler"/>
+    </resultMap>
 
+    <select id="selectQuestionClusterPage" resultMap="KnowledgeQuestionClusterResult">
+        SELECT
+        qc.id,
+        qc.standard_question,
+        qc.standard_answer,
+        qc.knowledge_unit_id,
+        qc.knowledge_group_id,
+        qc.status,
+        qc.association_count,
+        qc.faq_click_count,
+        qc.exposure_count,
+        qc.helpful_count,
+        qc.unhelpful_count,
+        qc.refusal_count,
+        qc.recent_questions,
+        qc.create_user_id,
+        qc.create_time,
+        qc.update_user_id,
+        qc.update_time,
+        qc.is_deleted,
+        ku.knowledge_unit_name,
+        kg.knowledge_group_name
+        FROM kmp_knowledge_question_cluster qc
+        INNER JOIN kmp_knowledge_unit ku
+        ON ku.id = qc.knowledge_unit_id
+        AND ku.is_deleted = 0
+
+        INNER JOIN kmp_knowledge_group kg
+        ON kg.id = qc.knowledge_group_id
+        AND kg.is_deleted = 0
+
+        WHERE qc.is_deleted = 0
+        <if test="query.knowledgeUnitName != null and query.knowledgeUnitName != ''">
+            AND ku.knowledge_unit_name LIKE CONCAT('%', #{query.knowledgeUnitName}, '%')
+        </if>
+        <if test="query.standardQuestion != null and query.standardQuestion != ''">
+            AND qc.standard_question LIKE CONCAT('%', #{query.standardQuestion}, '%')
+        </if>
+        <if test="query.status != null">
+            AND qc.status = #{query.status}
+        </if>
+        ORDER BY qc.update_time DESC, qc.id DESC
+    </select>
 </mapper>

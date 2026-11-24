@@ -11,9 +11,8 @@ import java.util.Collections;
 /**
  * 知识库模块 MyBatis-Plus 基础代码生成器。
  */
-public final class KmpCodeGenerator
-{
-    public static void main(String[] args){
+public final class KmpCodeGenerator {
+    public static void main(String[] args) {
 
         // 数据库凭据只从环境变量读取，避免将密码提交到代码仓库
         String databaseUrl = System.getenv("KMP_GENERATOR_DB_URL");

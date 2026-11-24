@@ -1,7 +1,10 @@
 package com.ycy.core.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ycy.core.entity.KnowledgeQuestionCluster;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * <p>
@@ -13,4 +16,5 @@ import com.ycy.core.entity.KnowledgeQuestionCluster;
  */
 public interface KnowledgeQuestionClusterMapper extends BaseMapper<KnowledgeQuestionCluster> {
 
+    IPage<KnowledgeQuestionCluster> selectQuestionClusterPage(Page<KnowledgeQuestionCluster> page,@Param("query")  KnowledgeQuestionCluster query);
 }

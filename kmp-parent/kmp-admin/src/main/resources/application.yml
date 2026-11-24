@@ -222,7 +222,7 @@ kmp:
     medium-score: 0.65
     pending-count: 5
   qwen:
-    api-key: ${DASHSCOPE_API_KEY:xxx}
+    api-key: ${DASHSCOPE_API_KEY:}
     base-url: ${DASHSCOPE_API_BASE_URL:https://dashscope.aliyuncs.com}
     embedding-model: text-embedding-v4
     embedding-dimension: 1024

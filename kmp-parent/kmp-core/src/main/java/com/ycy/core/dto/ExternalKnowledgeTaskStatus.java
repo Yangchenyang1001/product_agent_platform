@@ -49,7 +49,11 @@ public class ExternalKnowledgeTaskStatus implements Serializable
         @JsonProperty("item_name")
         private String itemName;
 
-        /** MinIO 对象路径，以斜杠开头且不包访问端点。 */
+        /**
+         * 原文件下载地址，外部服务实际回传的是带签名的绝对 URL。
+         * 使用侧必须先用 KnowledgeUnitServiceImpl#resolveDownloadUrl 判断是否已带协议头，
+         * 不可无条件拼接 MinIO 端点，否则会拼出非法地址。
+         */
         @JsonProperty("original_file_download_url")
         private String originalFileDownloadUrl;
 
