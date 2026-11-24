@@ -541,15 +541,28 @@ async function handleBack() {
 /** 校验下载地址后交由浏览器直接访问。 */
 function downloadOriginalFile() {
   const downloadUrl = String(baseForm.originalFileDownloadUrl || '').trim()
-  if (!/^https?:\/\//i.test(downloadUrl)) {
+  if (!downloadUrl) {
     proxy.$modal.msgError('原文件下载地址不存在')
+    return
+  }
+  // 后端返回的已是完整地址，这里只做合法性校验，避免把拼接错误的地址交给 window.open
+  let validUrl = ''
+  try {
+    const parsed = new URL(downloadUrl)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('unsupported protocol')
+    }
+    validUrl = parsed.href
+  } catch (e) {
+    proxy.$modal.msgError('原文件下载地址不合法')
+    console.error('[知识单元详情] 下载地址解析失败：', downloadUrl)
     return
   }
   console.log('[知识单元详情] 下载原文件：', {
     knowledgeUnitId: baseForm.id,
     fileName: baseForm.originalFileName
   })
-  window.open(downloadUrl, '_blank', 'noopener,noreferrer')
+  window.open(validUrl, '_blank', 'noopener,noreferrer')
 }
 
 function getBaseSnapshot() {
