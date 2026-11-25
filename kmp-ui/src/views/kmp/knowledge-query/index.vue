@@ -107,27 +107,22 @@
               @keydown="handleQuestionKeydown"
             />
             <div
-              v-if="suggestionLoading || suggestionList.length"
+              v-if="suggestionList.length"
               class="faq-suggestion-panel"
               role="listbox"
               aria-label="FAQ 联想"
             >
-              <div v-if="suggestionLoading" class="faq-suggestion-loading">
-                <el-icon class="is-loading"><Loading /></el-icon> 正在查询 FAQ
-              </div>
-              <template v-else>
-                <button
-                  v-for="(faq, index) in suggestionList"
-                  :key="faq.id"
-                  type="button"
-                  class="faq-suggestion-item"
-                  :class="{ active: index === activeSuggestionIndex }"
-                  role="option"
-                  :aria-selected="index === activeSuggestionIndex"
-                  @mouseenter="activeSuggestionIndex = index"
-                  @click="selectFaq(faq, 'suggestion')"
-                >{{ faq.standardQuestion }}</button>
-              </template>
+              <button
+                v-for="(faq, index) in suggestionList"
+                :key="faq.id"
+                type="button"
+                class="faq-suggestion-item"
+                :class="{ active: index === activeSuggestionIndex }"
+                role="option"
+                :aria-selected="index === activeSuggestionIndex"
+                @mouseenter="activeSuggestionIndex = index"
+                @click="selectFaq(faq, 'suggestion')"
+              >{{ faq.standardQuestion }}</button>
             </div>
           </div>
           <el-button
@@ -260,7 +255,6 @@ const faqSelecting = ref(false)
 const latestItemName = ref('')
 const recommendationList = ref([])
 const suggestionList = ref([])
-const suggestionLoading = ref(false)
 const activeSuggestionIndex = ref(-1)
 const streamState = ref('idle')
 const eventSource = shallowRef(null)
@@ -356,7 +350,6 @@ function clearFaqSuggestions() {
   faqSuggestionTimer = null
   suggestionRequestVersion += 1
   suggestionList.value = []
-  suggestionLoading.value = false
   activeSuggestionIndex.value = -1
 }
 
@@ -368,7 +361,6 @@ function handleQuestionInput() {
   const currentRequestVersion = suggestionRequestVersion
   faqSuggestionTimer = setTimeout(async () => {
     if (currentRequestVersion !== suggestionRequestVersion || keyword !== question.value.trim()) return
-    suggestionLoading.value = true
     console.log('[知识查询] 查询 FAQ 联想：', { apiType: 'suggestion' })
     try {
       const response = await listSuggestedFaqs(keyword)
@@ -383,8 +375,6 @@ function handleQuestionInput() {
     } catch (error) {
       if (currentRequestVersion === suggestionRequestVersion) suggestionList.value = []
       console.warn('[知识查询] FAQ 联想查询失败：', { apiType: 'suggestion' })
-    } finally {
-      if (currentRequestVersion === suggestionRequestVersion) suggestionLoading.value = false
     }
   }, 300)
 }
@@ -811,7 +801,7 @@ async function selectFaq(faq, sourceType) {
 /** 联想打开时优先处理方向键、Enter 和 Esc，其他 Enter 保留普通发送逻辑。 */
 function handleQuestionKeydown(event) {
   if (event.isComposing) return
-  if (event.key === 'Escape' && (suggestionList.value.length || suggestionLoading.value)) {
+  if (event.key === 'Escape' && suggestionList.value.length) {
     event.preventDefault()
     clearFaqSuggestions()
     return
@@ -1168,15 +1158,6 @@ loadSessions(true)
   border-radius: 7px;
   background: var(--el-bg-color-overlay);
   box-shadow: var(--el-box-shadow-light);
-}
-.faq-suggestion-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 15px;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
 }
 .faq-suggestion-item {
   display: block;
