@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
+import com.ycy.common.exception.ServiceException;
 import com.ycy.core.entity.KnowledgeQuerySession;
 import com.ycy.core.mapper.KnowledgeQuerySessionMapper;
 import com.ycy.core.service.KnowledgeQuerySessionService;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
@@ -33,9 +35,6 @@ import java.util.stream.Collectors;
 @Service
 public class KnowledgeQuerySessionServiceImpl extends ServiceImpl<KnowledgeQuerySessionMapper, KnowledgeQuerySession> implements KnowledgeQuerySessionService {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeQuerySessionServiceImpl.class);
-
-
-
 
 
     @Override
@@ -81,22 +80,27 @@ public class KnowledgeQuerySessionServiceImpl extends ServiceImpl<KnowledgeQuery
         log.info("开始删除知识查询会话，userId={}，sessionId={}", userId, id);
 
         LocalDateTime now = LocalDateTime.now();
-        log.info("调用外部知识库清除聊天记录，sessionId={}", id);
+        log.info("调用外部知识库删除聊天记录，sessionId={}", id);
 
         //远程调用删除外部知识库会话  聊天记录
-        restClient.delete().uri("/history/{session_id}", id)
+        ResponseEntity<Void> response = restClient.delete().uri("/history/{session_id}", id)
                 .retrieve().toBodilessEntity();
 
-        // 如果想在逻辑删除时同时更新审计字段（更新用户、更新时间），可以使用以下代码显示做update操作
-        LambdaUpdateWrapper<KnowledgeQuerySession> wrapper =
-                new LambdaUpdateWrapper<KnowledgeQuerySession>()
-                        .eq(KnowledgeQuerySession::getId, id)
-                        .eq(KnowledgeQuerySession::getCreateUserId, userId)
-                        .eq(KnowledgeQuerySession::getIsDeleted, 0)
-                        .set(KnowledgeQuerySession::getIsDeleted, 1)
-                        .set(KnowledgeQuerySession::getUpdateUserId, userId)
-                        .set(KnowledgeQuerySession::getUpdateTime, now);
-        return update(wrapper);
+        if (response.getStatusCode().is2xxSuccessful()) {
+            log.info("外部知识库删除聊天记录成功，sessionId={}", id);
+            LambdaUpdateWrapper<KnowledgeQuerySession> wrapper =
+                    new LambdaUpdateWrapper<KnowledgeQuerySession>()
+                            .eq(KnowledgeQuerySession::getId, id)
+                            .eq(KnowledgeQuerySession::getCreateUserId, userId)
+                            .eq(KnowledgeQuerySession::getIsDeleted, 0)
+                            .set(KnowledgeQuerySession::getIsDeleted, 1)
+                            .set(KnowledgeQuerySession::getUpdateUserId, userId)
+                            .set(KnowledgeQuerySession::getUpdateTime, now);
+            return update(wrapper);
+        } else {
+            throw new ServiceException("外部知识库删除聊天记录失败");
+        }
+
     }
 
     @Override
@@ -116,22 +120,27 @@ public class KnowledgeQuerySessionServiceImpl extends ServiceImpl<KnowledgeQuery
         }
         List<Long> sessionIds = sessionList.stream().map(KnowledgeQuerySession::getId).collect(Collectors.toList());
         log.info("调用外部知识库清除聊天记录，sessionIds={}", sessionIds.stream().map(String::valueOf).collect(Collectors.joining(",")));
-        restClient.post().uri("/history/clear_all")
+        ResponseEntity<Void> response = restClient.post().uri("/history/clear_all")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("session_ids", sessionIds))
                 .retrieve()
                 .toBodilessEntity();
 
-        LocalDateTime now = LocalDateTime.now();
+        if (response.getStatusCode().is2xxSuccessful()) {
+            log.info("外部知识库清除聊天记录成功，sessionIds={}", sessionIds.stream().map(String::valueOf).collect(Collectors.joining(",")));
+            LocalDateTime now = LocalDateTime.now();
 
-        // 只清理当前用户的有效索引，并同步维护审计字段。
-        LambdaUpdateWrapper<KnowledgeQuerySession> wrapper =
-                new LambdaUpdateWrapper<KnowledgeQuerySession>()
-                        .eq(KnowledgeQuerySession::getCreateUserId, userId)
-                        .eq(KnowledgeQuerySession::getIsDeleted, 0)
-                        .set(KnowledgeQuerySession::getIsDeleted, 1)
-                        .set(KnowledgeQuerySession::getUpdateUserId, userId)
-                        .set(KnowledgeQuerySession::getUpdateTime, now);
-        return update(wrapper);
+            // 只清理当前用户的有效索引，并同步维护审计字段。
+            LambdaUpdateWrapper<KnowledgeQuerySession> wrapper =
+                    new LambdaUpdateWrapper<KnowledgeQuerySession>()
+                            .eq(KnowledgeQuerySession::getCreateUserId, userId)
+                            .eq(KnowledgeQuerySession::getIsDeleted, 0)
+                            .set(KnowledgeQuerySession::getIsDeleted, 1)
+                            .set(KnowledgeQuerySession::getUpdateUserId, userId)
+                            .set(KnowledgeQuerySession::getUpdateTime, now);
+            return update(wrapper);
+        }else {
+            throw new ServiceException("外部知识库清除聊天记录失败");
+        }
     }
 }

@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ycy.core.entity.KnowledgeQuestionCluster;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
  * <p>
  * 问题簇表 Mapper 接口
@@ -17,4 +19,6 @@ import org.apache.ibatis.annotations.Param;
 public interface KnowledgeQuestionClusterMapper extends BaseMapper<KnowledgeQuestionCluster> {
 
     IPage<KnowledgeQuestionCluster> selectQuestionClusterPage(Page<KnowledgeQuestionCluster> page,@Param("query")  KnowledgeQuestionCluster query);
+
+    List<KnowledgeQuestionCluster> selectRecommendedFaqs(@Param("itemName")String itemName,@Param("limit") int faqRecommendationLimit);
 }

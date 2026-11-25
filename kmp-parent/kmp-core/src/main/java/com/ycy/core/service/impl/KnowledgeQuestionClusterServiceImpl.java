@@ -3,7 +3,9 @@ package com.ycy.core.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
+import com.ycy.core.client.FaqSearchClient;
 import com.ycy.core.constant.QuestionClusterConstants;
+import com.ycy.core.dto.KnowledgeFaqModels;
 import com.ycy.core.entity.KnowledgeGroup;
 import com.ycy.core.entity.KnowledgeQuestionCluster;
 import com.ycy.core.entity.KnowledgeUnit;
@@ -12,13 +14,18 @@ import com.ycy.core.service.KnowledgeGroupService;
 import com.ycy.core.service.KnowledgeQuestionClusterService;
 import com.ycy.core.service.KnowledgeQuestionClusterVectorService;
 import com.ycy.core.service.KnowledgeUnitService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -30,6 +37,9 @@ import java.util.Map;
  */
 @Service
 public class KnowledgeQuestionClusterServiceImpl extends ServiceImpl<KnowledgeQuestionClusterMapper, KnowledgeQuestionCluster> implements KnowledgeQuestionClusterService {
+
+    private static final Logger log = LoggerFactory.getLogger(KnowledgeQuestionClusterServiceImpl.class);
+
     @Autowired
     private KnowledgeQuestionClusterVectorService knowledgeQuestionClusterVectorService;
 
@@ -45,6 +55,7 @@ public class KnowledgeQuestionClusterServiceImpl extends ServiceImpl<KnowledgeQu
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createQuestionCluster(KnowledgeQuestionCluster cluster, Long userId) {
         LocalDateTime now = LocalDateTime.now();
         // 所有状态、统计和审计字段均由服务端初始化，忽略客户端伪造值。
@@ -104,6 +115,7 @@ public class KnowledgeQuestionClusterServiceImpl extends ServiceImpl<KnowledgeQu
      * {@inheritDoc}
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateQuestionCluster(KnowledgeQuestionCluster input, Long userId) {
 
         // 设置可信字段，防止客户端伪造
@@ -119,7 +131,8 @@ public class KnowledgeQuestionClusterServiceImpl extends ServiceImpl<KnowledgeQu
         // 已发布问题变化时，更新ES。
         KnowledgeQuestionCluster current = this.getById(input.getId());
         if (Integer.valueOf(QuestionClusterConstants.STATUS_PUBLISHED).equals(current.getStatus())) {
-            // TODO 更新ES
+            // 更新ES
+            faqSearchClient.saveFaq(current);
         }
 
         // 更新数据库
@@ -137,6 +150,7 @@ public class KnowledgeQuestionClusterServiceImpl extends ServiceImpl<KnowledgeQu
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void removeQuestionCluster(Long id, Long userId) {
         knowledgeQuestionClusterVectorService.deleteQuestionClusterVector(id);
         this.lambdaUpdate()
@@ -146,4 +160,147 @@ public class KnowledgeQuestionClusterServiceImpl extends ServiceImpl<KnowledgeQu
                 .set(KnowledgeQuestionCluster::getIsDeleted, 1)
                 .update();
     }
+
+    @Autowired
+    private FaqSearchClient faqSearchClient;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void publishQuestionCluster(Long id, Long userId) {
+        //获取当前问题簇数据记录
+        KnowledgeQuestionCluster cluster = this.getById(id);
+        Integer oldStatus = cluster.getStatus();
+
+        if (!Integer.valueOf(QuestionClusterConstants.STATUS_PUBLISHED).equals(oldStatus)) {
+            this.lambdaUpdate()
+                    .eq(KnowledgeQuestionCluster::getId, id)
+                    .eq(KnowledgeQuestionCluster::getStatus, oldStatus)
+                    .set(KnowledgeQuestionCluster::getStatus, QuestionClusterConstants.STATUS_PUBLISHED)
+                    .set(KnowledgeQuestionCluster::getUpdateUserId, userId)
+                    .set(KnowledgeQuestionCluster::getUpdateTime, LocalDateTime.now())
+                    .update();
+
+            //再保存es，如果出错，MySQL可以回滚
+            faqSearchClient.saveFaq(cluster);
+        }
+
+
+    }
+
+    @Override
+    public void unpublishQuestionCluster(Long id, Long userId) {
+
+        KnowledgeQuestionCluster knowledgeQuestionCluster = this.getById(id);
+        Integer oldStatus = knowledgeQuestionCluster.getStatus();
+        if (Integer.valueOf(QuestionClusterConstants.STATUS_PUBLISHED).equals(oldStatus)) {
+            this.lambdaUpdate()
+                    .eq(KnowledgeQuestionCluster::getId, id)
+                    .eq(KnowledgeQuestionCluster::getStatus, oldStatus)
+                    .set(KnowledgeQuestionCluster::getStatus, QuestionClusterConstants.STATUS_PENDING)
+                    .set(KnowledgeQuestionCluster::getUpdateUserId, userId)
+                    .set(KnowledgeQuestionCluster::getUpdateTime, LocalDateTime.now())
+                    .update();
+
+            //再保存es，如果出错，MySQL可以回滚
+            faqSearchClient.deleteFaq(id);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<KnowledgeFaqModels.KnowledgeFaqItem> listRecommendedFaqs(String itemName) {
+        List<KnowledgeQuestionCluster> clusters = baseMapper.selectRecommendedFaqs(itemName, QuestionClusterConstants.FAQ_RECOMMENDATION_LIMIT);
+        if (clusters == null || clusters.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> clusterIds = clusters.stream().map(KnowledgeQuestionCluster::getId).collect(Collectors.toList());
+        //累加曝光数
+        updateExposureCount(clusterIds);
+
+        List<KnowledgeFaqModels.KnowledgeFaqItem> list = clusters.stream().map(cluster -> toFaqItem(cluster)).toList();
+        return list;
+    }
+
+    @Override
+    public List<KnowledgeFaqModels.KnowledgeFaqItem> listSuggestedFaqs(String keyword) {
+
+        //小于5的字符不触发联想
+        if (QuestionClusterConstants.FAQ_SUGGESTION_MIN_LENGTH > keyword.length()) {
+            return Collections.emptyList();
+        }
+        // ES 全文匹配，返回按相关度排序的候选 ID。
+        List<Long> candidateIds = faqSearchClient.searchFaqIds(
+                keyword,
+                QuestionClusterConstants.FAQ_SUGGESTION_LIMIT,
+                QuestionClusterConstants.FAQ_SUGGESTION_MIN_SCORE
+        );
+        // 空候选直接返回。
+        if (candidateIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<KnowledgeQuestionCluster> validClusters = this.lambdaQuery()
+                .select(KnowledgeQuestionCluster::getId, KnowledgeQuestionCluster::getStandardQuestion)
+                .in(KnowledgeQuestionCluster::getId, candidateIds)
+                .eq(KnowledgeQuestionCluster::getStatus, QuestionClusterConstants.STATUS_PUBLISHED)
+                .list();
+
+        return validClusters.stream().map(cluster -> toFaqItem(cluster)).collect(Collectors.toList());
+    }
+
+
+    private static KnowledgeFaqModels.KnowledgeFaqItem toFaqItem(KnowledgeQuestionCluster cluster) {
+        KnowledgeFaqModels.KnowledgeFaqItem item = new KnowledgeFaqModels.KnowledgeFaqItem();
+        item.setId(cluster.getId());
+        item.setStandardQuestion(cluster.getStandardQuestion());
+        return item;
+    }
+
+
+    @Override
+    public KnowledgeFaqModels.KnowledgeFaqAnswer answerQuestionCluster(Long id, KnowledgeFaqModels.KnowledgeFaqAnswerRequest request, Long userId) {
+
+        KnowledgeQuestionCluster cluster = this.lambdaQuery()
+                .eq(KnowledgeQuestionCluster::getId, id)
+                .eq(KnowledgeQuestionCluster::getStatus, QuestionClusterConstants.STATUS_PUBLISHED)
+                .one();
+        if (cluster == null) {
+            return null;
+        }
+        KnowledgeFaqModels.KnowledgeFaqAnswer answer = new KnowledgeFaqModels.KnowledgeFaqAnswer();
+        answer.setId(cluster.getId());
+        answer.setStandardQuestion(cluster.getStandardQuestion());
+        answer.setStandardAnswer(cluster.getStandardAnswer());
+
+        //控制点击数增加
+        updateFaqClickCount(List.of(id));
+
+        return answer;
+    }
+
+    private boolean updateExposureCount(List<Long> ids) {
+        try {
+            return this.lambdaUpdate()
+                    .in(KnowledgeQuestionCluster::getId, ids)
+                    .setSql(" exposure_count = COALESCE(exposure_count, 0) + 1 ")
+                    .update();
+        } catch (RuntimeException exception) {
+            log.error("FAQ曝光数计数失败，ids={}, error={}", ids, exception);
+            return false;
+        }
+    }
+
+    private boolean updateFaqClickCount(List<Long> ids) {
+        try {
+            return this.lambdaUpdate()
+                    .in(KnowledgeQuestionCluster::getId, ids)
+                    .setSql(" faq_click_count = COALESCE(faq_click_count, 0) + 1 ")
+                    .update();
+        } catch (Exception e) {
+            log.error("FAQ点击数计数失败，ids={}, error={}", ids, e);
+            return false;
+        }
+    }
+
+
 }
